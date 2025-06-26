@@ -1,32 +1,52 @@
+import yt_dlp
 import os
-from dotenv import load_dotenv
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    filters
-)
 
-from bot.handlers import start, process_url, button_handler
+# Domain to cookies mapping
+COOKIE_MAP = {
+    "sonyliv.com": "cookies/sonyliv.txt",
+    "zee5.com": "cookies/zee5.txt",
+    "jiocinema.com": "cookies/jio.txt",
+    "hotstar.com": "cookies/hotstar.txt",
+}
 
-# Load environment variables from .env file
-load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Get correct cookies file
+def get_cookie_path(url):
+    for domain, path in COOKIE_MAP.items():
+        if domain in url:
+            full_path = os.path.join(os.getcwd(), path)
+            if os.path.exists(full_path):
+                return full_path
+    return None
 
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not found in environment variables!")
+# Extract formats (m3u8/mp4)
+def extract_formats(url):
+    cookie_file = get_cookie_path(url)
+    ydl_opts = {
+        'quiet': True,
+        'skip_download': True,
+        'cookies': cookie_file,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        formats = []
+        for f in info.get("formats", []):
+            if f.get("vcodec") != "none":
+                formats.append({
+                    "format_id": f["format_id"],
+                    "ext": f["ext"],
+                    "resolution": f.get("resolution") or f"{f.get('width')}x{f.get('height')}",
+                    "url": f["url"]
+                })
+        return formats, info.get("title", "Video")
 
-def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # Register command and message handlers
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
-    app.add_handler(CallbackQueryHandler(button_handler))
-
-    print("Bot is running...")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+# Download selected format
+def download_video(url, output_path):
+    cookie_file = get_cookie_path(url)
+    ydl_opts = {
+        'outtmpl': output_path,
+        'quiet': False,
+        'cookies': cookie_file,
+        'merge_output_format': 'mp4',
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
