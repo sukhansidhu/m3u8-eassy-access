@@ -1,30 +1,21 @@
 import yt_dlp
 import os
 
-# Domain to cookies mapping
-COOKIE_MAP = {
-    "sonyliv.com": "cookies/sonyliv.txt",
-    "zee5.com": "cookies/zee5.txt",
-    "jiocinema.com": "cookies/jio.txt",
-    "hotstar.com": "cookies/hotstar.txt",
-}
-
-# Get correct cookies file
-def get_cookie_path(url):
-    for domain, path in COOKIE_MAP.items():
-        if domain in url:
-            full_path = os.path.join(os.getcwd(), path)
-            if os.path.exists(full_path):
-                return full_path
+def get_cookies_for_url(url):
+    if "zee5.com" in url:
+        return "cookies/zee5.txt"
+    elif "sonyliv.com" in url:
+        return "cookies/sonyliv.txt"
+    elif "hotstar.com" in url:
+        return "cookies/hotstar.txt"
     return None
 
-# Extract formats (m3u8/mp4)
 def extract_formats(url):
-    cookie_file = get_cookie_path(url)
+    cookies = get_cookies_for_url(url)
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
-        'cookies': cookie_file,
+        'cookies': cookies if cookies and os.path.exists(cookies) else None,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -39,13 +30,12 @@ def extract_formats(url):
                 })
         return formats, info.get("title", "Video")
 
-# Download selected format
 def download_video(url, output_path):
-    cookie_file = get_cookie_path(url)
+    cookies = get_cookies_for_url(url)
     ydl_opts = {
         'outtmpl': output_path,
         'quiet': False,
-        'cookies': cookie_file,
+        'cookies': cookies if cookies and os.path.exists(cookies) else None,
         'merge_output_format': 'mp4',
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
