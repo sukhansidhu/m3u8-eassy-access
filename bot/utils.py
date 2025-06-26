@@ -1,35 +1,32 @@
-import yt_dlp
 import os
+from dotenv import load_dotenv
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    filters
+)
 
-# Load cookies file from ENV or default path
-COOKIES_PATH = os.getenv("COOKIES_PATH", "cookies.txt")
+from bot.handlers import start, process_url, button_handler
 
-def extract_formats(url):
-    ydl_opts = {
-        'quiet': True,
-        'skip_download': True,
-        'cookies': COOKIES_PATH if os.path.exists(COOKIES_PATH) else None,
-        'force_generic_extractor': False,  # Let yt-dlp detect extractor
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        formats = []
-        for f in info.get("formats", []):
-            if f.get("vcodec") != "none":
-                formats.append({
-                    "format_id": f["format_id"],
-                    "ext": f["ext"],
-                    "resolution": f.get("resolution") or f"{f.get('width')}x{f.get('height')}",
-                    "url": f["url"]
-                })
-        return formats, info.get("title", "Video")
+# Load environment variables from .env file
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-def download_video(url, output_path):
-    ydl_opts = {
-        'outtmpl': output_path,
-        'quiet': False,
-        'cookies': COOKIES_PATH if os.path.exists(COOKIES_PATH) else None,
-        'merge_output_format': 'mp4',
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN not found in environment variables!")
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Register command and message handlers
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_url))
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    print("Bot is running...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
